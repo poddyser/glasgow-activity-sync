@@ -96,7 +96,17 @@ def main():
     while url and url != last_url:
         last_url = url
         print(f"Fetching page {page + 1}: {url}")
-        res = httpx.get(url, headers={"Accept": "application/json"}, timeout=30)
+        res = httpx.get(
+            url,
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en-GB,en;q=0.9",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Referer": "https://glasgowlife.sportsuite.co.uk/",
+            },
+            timeout=30,
+            follow_redirects=True,
+        )
         res.raise_for_status()
         data = res.json()
         items = data.get("items", [])
