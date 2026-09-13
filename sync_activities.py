@@ -1,5 +1,4 @@
 import json
-import hashlib
 import httpx
 
 FEED_START = "https://www.sportsuite.co.uk/api/cs-api/openactive?afterTimestamp=0&afterId=0"
@@ -28,9 +27,9 @@ def is_glasgow(d):
     gl_url = "glasgowlife" in url or "glasgowlife" in org_url
     return bool(in_bounds or g_post or gl_url)
 
-def make_id(d):
-    key = f"{d.get('name','')}|{d.get('location',{}).get('geo',{}).get('latitude','')}|{d.get('location',{}).get('geo',{}).get('longitude','')}|{(d.get('organizer') or {}).get('name','')}"
-    return hashlib.md5(key.encode()).hexdigest()[:16]
+def make_id(item):
+    # Use the feed's own unique ID — no hashing needed
+    return str(item.get('id', ''))
 
 def parse_activity(item):
     d = item["data"]
@@ -68,7 +67,7 @@ def parse_activity(item):
         address = str(addr)
 
     return {
-        "id": make_id(d),
+        "id": str(item["id"]),
         "name": d.get("name", ""),
         "activity_type": acts[0].get("prefLabel", "Activity") if acts else "Activity",
         "organiser": (d.get("organizer") or {}).get("name", ""),
@@ -114,7 +113,7 @@ def main():
 
         for item in items:
             if item.get("state") == "deleted":
-                all_to_delete.append(make_id(item.get("data", {})) if item.get("data") else str(item.get("id")))
+                all_to_delete.append(make_id(item))
             elif item.get("state") == "updated" and item.get("data") and is_glasgow(item["data"]):
                 parsed = parse_activity(item)
                 if parsed["lat"] and parsed["lng"]:
