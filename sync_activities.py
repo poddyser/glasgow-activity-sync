@@ -31,6 +31,16 @@ def make_id(item):
     # Use the feed's own unique ID — no hashing needed
     return str(item.get('id', ''))
 
+def has_future_date(parsed):
+    from datetime import date
+    next_date = parsed.get("next_date", "")
+    if not next_date:
+        return False
+    try:
+        return date.fromisoformat(next_date) >= date.today()
+    except ValueError:
+        return False
+
 def parse_activity(item):
     d = item["data"]
     loc = d.get("location", {})
@@ -116,7 +126,7 @@ def main():
                 all_to_delete.append(make_id(item))
             elif item.get("state") == "updated" and item.get("data") and is_glasgow(item["data"]):
                 parsed = parse_activity(item)
-                if parsed["lat"] and parsed["lng"]:
+                if parsed["lat"] and parsed["lng"] and has_future_date(parsed):
                     all_to_upsert.append(parsed)
 
         next_url = data.get("next")
