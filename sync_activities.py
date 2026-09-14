@@ -136,6 +136,37 @@ def main():
     print(f"Activities to upsert: {len(all_to_upsert)}")
     print(f"Activities to delete: {len(all_to_delete)}")
 
+    # ── Apply location overrides from Supabase ────────────────
+    try:
+        override_res = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/activity_overrides?select=*",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+            },
+            timeout=15,
+        )
+        overrides = override_res.json() if override_res.status_code == 200 else []
+        print(f"Loaded {len(overrides)} location overrides")
+    except Exception as e:
+        overrides = []
+        print(f"Warning: could not load overrides: {e}")
+
+    def apply_overrides(activity, overrides):
+        for ov in overrides:
+            field = ov.get("match_field", "venue")
+            value = ov.get("match_value", "")
+            actual = activity.get(field, "") or ""
+            if actual.lower() == value.lower():
+                if ov.get("venue"):  activity["venue"]   = ov["venue"]
+                if ov.get("address"): activity["address"] = ov["address"]
+                if ov.get("lat"):    activity["lat"]     = ov["lat"]
+                if ov.get("lng"):    activity["lng"]     = ov["lng"]
+        return activity
+
+    all_to_upsert = [apply_overrides(a, overrides) for a in all_to_upsert]
+    print(f"Overrides applied")
+
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
