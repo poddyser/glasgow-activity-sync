@@ -105,18 +105,56 @@ def main():
     while url and url != last_url:
         last_url = url
         print(f"Fetching page {page + 1}: {url}")
-        res = httpx.get(
-            url,
-            headers={
-                "Accept": "application/json, text/plain, */*",
-                "Accept-Language": "en-GB,en;q=0.9",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                "Referer": "https://glasgowlife.sportsuite.co.uk/",
-            },
-            timeout=30,
-            follow_redirects=True,
-        )
-        res.raise_for_status()
+        # Rotate through different User-Agents to avoid bot detection
+        import random
+        user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15",
+        ]
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-GB,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "User-Agent": random.choice(user_agents),
+            "Referer": "https://glasgowlife.sportsuite.co.uk/activity-finder/activities",
+            "Origin": "https://glasgowlife.sportsuite.co.uk",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-site",
+            "sec-ch-ua": '"Google Chrome";v="125", "Chromium";v="125", "Not=A?Brand";v="99"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"',
+        }
+
+        # Retry up to 3 times with backoff on 403
+        max_retries = 3
+        res = None
+        for attempt in range(max_retries):
+            try:
+                res = httpx.get(
+                    url,
+                    headers={**headers, "User-Agent": random.choice(user_agents)},
+                    timeout=30,
+                    follow_redirects=True,
+                )
+                if res.status_code == 403:
+                    wait = (attempt + 1) * 10
+                    print(f"  403 on attempt {attempt+1}, waiting {wait}s...")
+                    import time
+                    time.sleep(wait)
+                    continue
+                res.raise_for_status()
+                break
+            except httpx.HTTPStatusError as e:
+                if attempt == max_retries - 1:
+                    raise
+                import time
+                time.sleep((attempt + 1) * 10)
+        if res is None:
+            raise Exception("All retries failed")
         data = res.json()
         items = data.get("items", [])
         page += 1
